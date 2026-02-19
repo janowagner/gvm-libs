@@ -154,7 +154,7 @@ gvm_http_new (const gchar *url, gvm_http_method_t method, const gchar *payload,
       struct curl_blob ca_blob = {(void *) ca_cert, strlen (ca_cert),
                                   CURL_BLOB_COPY};
       curl_easy_setopt (curl, CURLOPT_SSL_VERIFYPEER, 1L);
-      curl_easy_setopt (curl, CURLOPT_SSL_VERIFYHOST, 1L);
+      curl_easy_setopt (curl, CURLOPT_SSL_VERIFYHOST, 2L);
       if (curl_easy_setopt (curl, CURLOPT_CAINFO_BLOB, &ca_blob) != CURLE_OK)
         {
           g_warning ("%s: Failed to set CA certificate", __func__);
@@ -164,11 +164,12 @@ gvm_http_new (const gchar *url, gvm_http_method_t method, const gchar *payload,
     }
   else
     {
-      // Accept insecure connections if no CA cert is provided
-      curl_easy_setopt (curl, CURLOPT_SSL_VERIFYPEER, 0L);
-      curl_easy_setopt (curl, CURLOPT_SSL_VERIFYHOST, 0L);
+      // No custom CA cert provided; use system default CA store
+      curl_easy_setopt (curl, CURLOPT_SSL_VERIFYPEER, 1L);
+      curl_easy_setopt (curl, CURLOPT_SSL_VERIFYHOST, 2L);
       curl_easy_setopt (curl, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_2);
-      g_debug ("%s: Server certificate verification disabled.", __func__);
+      g_debug ("%s: No CA certificate provided, using system CA store.",
+               __func__);
     }
 
   // Handle Client Certificate & Private Key for authentication
