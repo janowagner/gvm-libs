@@ -112,8 +112,7 @@ open_live (char *iface, char *filter)
  * TODO: simplify and read https://tools.ietf.org/html/rfc826
  */
 static void
-got_packet (u_char *user_data,
-            __attribute__ ((unused)) const struct pcap_pkthdr *header,
+got_packet (u_char *user_data, const struct pcap_pkthdr *header,
             const u_char *packet)
 {
   struct ip *ip;
@@ -122,6 +121,14 @@ got_packet (u_char *user_data,
   hosts_data_t *hosts_data;
   gchar *addr_str = NULL;
 
+  /* Need at least 17 bytes to read the IP version at offset 16. */
+  if (header->caplen < 17)
+    {
+      g_debug ("%s: Packet too short (%u bytes) to read IP version",
+               __func__, header->caplen);
+      return;
+    }
+
   ip = (struct ip *) (packet + 16);
   version = ip->ip_v;
   scanner = (scanner_t *) user_data;
@@ -129,6 +136,13 @@ got_packet (u_char *user_data,
 
   if (version == 4)
     {
+      /* memcpy reads 4 bytes starting at offset 28, so need at least 32. */
+      if (header->caplen < 32)
+        {
+          g_debug ("%s: IPv4 packet too short (%u bytes)", __func__,
+                   header->caplen);
+          return;
+        }
       addr_str = g_malloc0 (INET_ADDRSTRLEN);
       struct in_addr sniffed_addr;
       /* was +26 (14 ETH + 12 IP) originally but was off by 2 somehow */
@@ -142,6 +156,13 @@ got_packet (u_char *user_data,
     }
   else if (version == 6)
     {
+      /* memcpy reads 16 bytes starting at offset 24, so need at least 40. */
+      if (header->caplen < 40)
+        {
+          g_debug ("%s: IPv6 packet too short (%u bytes)", __func__,
+                   header->caplen);
+          return;
+        }
       addr_str = g_malloc0 (INET6_ADDRSTRLEN);
       struct in6_addr sniffed_addr;
       /* (14 ETH + 8 IP + offset 2)  */
@@ -162,6 +183,13 @@ got_packet (u_char *user_data,
        * sized field. */
       /* read rfc https://tools.ietf.org/html/rfc826 for exact length or how
       to get it */
+      /* inet_ntop reads 4 bytes at offset 22 + sizeof(struct arphdr). */
+      if (header->caplen < 22 + sizeof (struct arphdr) + 4)
+        {
+          g_debug ("%s: ARP packet too short (%u bytes)", __func__,
+                   header->caplen);
+          return;
+        }
       struct arphdr *arp =
         (struct arphdr *) (packet + 14 + 2 + 6 + sizeof (struct arphdr));
       addr_str = g_malloc0 (INET_ADDRSTRLEN);
